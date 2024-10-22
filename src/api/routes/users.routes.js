@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { getUser, getUsers, insertUser, updateUser, deleteUser, getUserByCi } from '../controllers/users.controller.js';
+import { getUser, getUsers, deleteUser, getUserByCi, getUsersActualYear, updateOrCreateUser } from '../controllers/users.controller.js';
 import { isUserAuthenticated } from '../../middlewares/auth.js';
 
 const router = Router();
 
 //GET ALL USERS
 router.get('/users', getUsers)
+
+router.get('/users/actual-year', getUsersActualYear)
 
 router.get("test",isUserAuthenticated, async (req,resp) => {
     
@@ -19,11 +21,9 @@ router.get('/users/ci/:ci', getUserByCi)
 //DELETE USER
 router.delete('/users/:id', deleteUser)
 
-//UPDATE USER
-router.put('/users/:id', updateUser)
 
 //CREATE USER
-router.post('/users', insertUser)
+router.post('/users', updateOrCreateUser)
 
 
 

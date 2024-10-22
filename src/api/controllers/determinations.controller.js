@@ -1,4 +1,5 @@
 import pool from "../../db.js"; 
+import { updateQueryLogs } from "../utils/utils.js";
 
 //GET ALL DETERMINATIONS
 export const getAllDeterminations = async (req, res) => {
@@ -24,8 +25,11 @@ export const getAllDeterminations = async (req, res) => {
                 }
             );
         }
+
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }

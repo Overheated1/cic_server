@@ -1,4 +1,5 @@
-import pool from "../../db.js"; 
+import pool from "../../db.js";
+import { updateQueryLogs } from "../utils/utils.js"; 
 
 //INSERT A TEMPERATURE TYPE
 export const insertTemperature = async (req, res) => {
@@ -21,9 +22,10 @@ export const insertTemperature = async (req, res) => {
                 "code" : 200,
             });
         }
-
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }
@@ -52,8 +54,11 @@ export const getAllTemperatures = async (req, res) => {
                 }
             );
         }
+
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }

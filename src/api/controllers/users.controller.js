@@ -1,23 +1,38 @@
 import pool from "../../db.js"; 
 import jwt from "jsonwebtoken";
+import { updateQueryLogs } from "../utils/utils.js";
 
 //INSERT A USER
-export const insertUser = async (req, res) => {
+export const updateOrCreateUser = async (req, res) => {
+    const currentDate = new Date().toISOString().split("T")[0];
+
     try {
         const {
+            id,
             name,
             password,
-            role,
-            ci
+            ci,
+            email,
+            role_id,
         } = req.body;
 
-        const result = await pool.query("INSERT INTO USERS (name,password,role,ci) VALUES($1,$2,$3,$4) RETURNING *", [name, password, role, ci])
+        let is_insertion_op = true;
+        let result = await pool.query("SELECT u.id FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.id = $1", [id]);
+        console.log(result.rows,id);
+        if(result.rows.length){
+            is_insertion_op = false;
+            result = await pool.query("UPDATE users SET name = $1,password = $2,ci = $3,email = $4 WHERE id=$5 RETURNING *", [name,password,ci,email,id]);
+        }else{
+            result = await pool.query("INSERT INTO users (name,password,ci,email,user_created_date) VALUES($1,$2,$3,$4,$5) RETURNING *", [name,password,ci,email,currentDate])
+            if(result?.rows?.length)
+                result = await pool.query("INSERT INTO users_roles (role_id,user_id) VALUES($1,$2) RETURNING *", [role_id,result.rows[0]['id']])
+        }
 
         if(result.rows.length == 0){
             res.status(200).json({
                 "result": result.rows,
                 "code" : 409,
-                "message" : "Usuario no insertado"
+                "message" : `Usuario no insertado${is_insertion_op ? "insertado" : "actualizado"}`
             });
         }else{
             res.status(200).json({
@@ -25,8 +40,53 @@ export const insertUser = async (req, res) => {
                 "code" : 200,
             });
         }
+
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
+        console.error(error);
+    }
+}
+
+
+export const getUsersActualYear = async (req,res) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const previousYear = currentYear - 1;
+
+    try {
+        const usersByYear = await pool.query(`SELECT EXTRACT(YEAR FROM user_created_date) AS year, COUNT(*) AS total_users FROM users WHERE EXTRACT(YEAR FROM user_created_date) IN ($1, $2) GROUP BY year`,[currentYear, previousYear]);
+
+        const result = usersByYear.rows.reduce((acc, row) => {
+            acc[row.year] = row.total_users;
+            return acc;
+        }, {});
+
+        if(Object.keys(result).length < 2){
+            result[previousYear] = "0";
+        }
+
+        const currentYearUsers = parseInt(result[currentYear]);
+        const previousYearUsers = parseInt(result[previousYear] || 0);
+        const userChangePercentage = previousYearUsers ? ((currentYearUsers - previousYearUsers) / previousYearUsers) * 100 : 0;
+
+        result['user_change_percent'] = userChangePercentage;
+
+        if(Object.keys(result).length == 0) 
+            res.status(409).json({"message" : "No se pudo obtener la información de los usuarios","code" : 409})
+        else
+            res.status(200).json(
+                {
+                    "result": result,
+                    "code": 200,
+                }
+            );
+
+        updateQueryLogs("success");
+    } catch (error) {
+        res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }
@@ -38,7 +98,7 @@ export const getUsers = async (req, res) => {
         const result = await pool.query("SELECT * FROM users");
         
         if(result.rows.length == 0) 
-            res.status(409).json({"message" : "Usuario no encontrado","code" : 409})
+            res.status(409).json({"message" : "Usuarios no encontrados","code" : 409})
         else
             res.status(200).json(
                 {
@@ -47,8 +107,10 @@ export const getUsers = async (req, res) => {
                 }
             );
 
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }
@@ -76,8 +138,10 @@ export const getUser = async (req, res) => {
                 }
             );
 
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }
@@ -108,39 +172,10 @@ export const getUserByCi = async (req, res) => {
 
         }
             
-
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
-        console.error(error);
-    }
-}
-
-
-//UPDATE USER
-export const updateUser = async (req, res) => {
-    try {
-        const {
-            name,
-            password,
-            ci,
-            email
-        } = req.body;
-
-            const result = await pool.query("UPDATE users SET name=$1,password=$2,role=$3,email=$5 WHERE ci = $4 RETURNING *", [name, password,ci,email])
-            
-            if(result.rows.length == 0) 
-                res.status(409).json({"message" : "Usuario no actualizado","code" : 409})
-            else
-                res.status(200).json(
-                    {
-                        "result": result.rows,
-                        "code": 200,
-                        "result": "Usuario actualizado correctamente"
-                    }
-                );
-
-    } catch (error) {
-        res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }
@@ -148,22 +183,26 @@ export const updateUser = async (req, res) => {
 //DELETE USER
 export const deleteUser = async (req, res) => {
     try {
-        const { ci } = req.params;
-        const result = await pool.query("DELETE FROM users WHERE ci = $1 RETURNING *", [ci])
+        const { id } = req.params;
+        
+        let result = await pool.query("DELETE FROM users WHERE id = $1 RETURNING *", [id])
+        let result_roles = await pool.query("DELETE FROM users_roles WHERE user_id = $1 RETURNING *", [id])
         
         if(result.rows.length == 0) 
             res.status(409).json({"message" : "Usuario no eliminado","code" : 409})
         else
             res.status(200).json(
                 {
-                    "result": result.rows,
+                    "result": [...result.rows],
                     "code": 200,
                     "result": "Usuario eliminado correctamente"
                 }
             );
 
+        updateQueryLogs("success");
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
         console.error(error);
     }
 }
