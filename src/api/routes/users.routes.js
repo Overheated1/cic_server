@@ -22,7 +22,7 @@ router.get('/users/ci/:ci', getUserByCi)
 router.delete('/users/:id', deleteUser)
 
 
-//CREATE USER
+//CREATE OR UPDATE USER
 router.post('/users', updateOrCreateUser)
 
 

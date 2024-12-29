@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getRepeatability, insertRepeatability,getRepeatabilityByDate } from '../controllers/repeatability.controller.js';
+import { getRepeatability, insertRepeatability,getRepeatabilityByDate,updateAndGetRemainingModificationsRepeatability } from '../controllers/repeatability.controller.js';
 
 const router = Router();
 
@@ -11,5 +11,7 @@ router.get('/repeatability', getRepeatabilityByDate)
 
 //INSERT A REPEATABILITY DATA
 router.post('/repeatability', insertRepeatability)
+
+router.post("/repeatability/remaining-modifications",updateAndGetRemainingModificationsRepeatability);
 
 export default router;

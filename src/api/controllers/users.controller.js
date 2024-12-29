@@ -14,14 +14,17 @@ export const updateOrCreateUser = async (req, res) => {
             ci,
             email,
             role_id,
+            institution_id
         } = req.body;
+
+        console.log(req.body);
 
         let is_insertion_op = true;
         let result = await pool.query("SELECT u.id FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.id = $1", [id]);
-        console.log(result.rows,id);
+
         if(result.rows.length){
             is_insertion_op = false;
-            result = await pool.query("UPDATE users SET name = $1,password = $2,ci = $3,email = $4 WHERE id=$5 RETURNING *", [name,password,ci,email,id]);
+            result = await pool.query("UPDATE users SET name = $1,password = $2,ci = $3,email = $4,institution_id = $5 WHERE id=$6 RETURNING *", [name,password,ci,email,institution_id,id]);
         }else{
             result = await pool.query("INSERT INTO users (name,password,ci,email,user_created_date) VALUES($1,$2,$3,$4,$5) RETURNING *", [name,password,ci,email,currentDate])
             if(result?.rows?.length)
@@ -120,7 +123,7 @@ export const getUser = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const result = await pool.query("SELECT u.id,u.ci,u.name,u.password,r.role_name,r.role_deep_level FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.id = $1", [id]);
+        const result = await pool.query("SELECT u.id,u.ci,u.name,u.password,u.institution_id,r.role_name,r.role_deep_level FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.id = $1", [id]);
 
         result.rows['token'] = jwt.sign({
             userId: user.id
@@ -151,25 +154,30 @@ export const getUserByCi = async (req, res) => {
     try {
         const { ci } = req.params;
 
-        const result = await pool.query("SELECT u.id,u.ci,u.name,u.password,r.role_name,r.role_deep_level FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.ci = $1", [ci]);
+        const result = await pool.query("SELECT u.id,u.ci,u.email,u.name,u.password,u.institution_id,r.role_name,r.role_deep_level FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.ci = $1", [ci]);
 
         if(result.rows.length == 0) 
             res.status(409).json({"message" : "Usuario no encontrado","code" : 409})
         else{
-            
-        result.rows[0]['token'] = jwt.sign({
+            const result_institution = await pool.query("SELECT * FROM institutions WHERE institution_id = $1", [result.rows[0]['institution_id']]);
+
+            if(result_institution.rows.length)
+                result.rows[0] = { ...result.rows[0],...result_institution.rows[0] };
+
+            result.rows[0]['token'] = jwt.sign({
                 roleDeepLevel: result.rows[0].role_deep_level
             }, `${process.env.JWT_SECRET_KEY}`, {
                 expiresIn: '1h'
             });
-        
-        res.status(200).json(
-            {
-                "result": result.rows,
-                "code": 200,
-            }
-        );
 
+            console.log(result.rows[0])
+            
+            res.status(200).json(
+                {
+                    "result": result.rows[0],
+                    "code": 200,
+                }
+            );
         }
             
         updateQueryLogs("success");
@@ -184,8 +192,9 @@ export const getUserByCi = async (req, res) => {
 export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
-        
         let result = await pool.query("DELETE FROM users WHERE id = $1 RETURNING *", [id])
+        console.log(id,result.rows)
+
         let result_roles = await pool.query("DELETE FROM users_roles WHERE user_id = $1 RETURNING *", [id])
         
         if(result.rows.length == 0) 

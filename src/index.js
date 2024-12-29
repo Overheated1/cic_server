@@ -10,7 +10,7 @@ import determinationsRoutes from "./api/routes/determinations.routes.js";
 import deviationsRoutes from "./api/routes/deviations.routes.js";
 import institutionsRoutes from "./api/routes/institutions.routes.js";
 import repeatabilityRoutes from "./api/routes/repeatability.routes.js";
-import temperaturesRoutes from "./api/routes/temperatures.routes.js";
+import reproducibilityRoutes from "./api/routes/reproducibility.routes.js";
 import serumsRoutes from "./api/routes/serums.routes.js";
 import databaseRoutes from "./api/routes/database.routes.js";
 
@@ -38,7 +38,7 @@ try{
     app.use(deviationsRoutes);
     app.use(institutionsRoutes);
     app.use(repeatabilityRoutes);
-    app.use(temperaturesRoutes);
+    app.use(reproducibilityRoutes);
     app.use(serumsRoutes);
     app.use(databaseRoutes);
     

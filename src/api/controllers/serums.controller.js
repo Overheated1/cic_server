@@ -5,17 +5,45 @@ import { updateQueryLogs } from "../utils/utils.js";
 export const getAllControllers = async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM commercial_serums");
+        const resultUrineControl = await pool.query("SELECT * FROM urine_control");
+        const resultSerums = await pool.query("SELECT * FROM processed_serum");
 
-        if(result.rows.length == 0) 
+        let rowCommercialSerums = [];
+        let rowUrineControl = [];
+        let rowProcessedSerums = [];
+
+
+        if(result.rows.length != 0) rowCommercialSerums = result.rows
+        if(resultUrineControl.rows.length != 0) rowUrineControl = resultUrineControl.rows 
+        if(resultSerums.rows.length != 0)  rowProcessedSerums = resultSerums.rows 
+
+
+        if(!result.rows && !resultUrineControl.rows && !resultSerums.rows)
             res.status(200).json({"message" : "Ningún suero comercial encontrado","code" : 404})
         else{
+
             let formattedData = [];
-            for(let i = 0;i < result.rows.length;i++){
+            for(let i = 0;i < rowCommercialSerums.length;i++){
+
                 formattedData.push({
-                    "text":result.rows[i]['commercial_serum_name'],
-                    "value":result.rows[i]['id_commercial_serum'],
-                    "brand":result.rows[i]['commercial_brand'],
-                    "concentration":result.rows[i]['concentration'],
+                    "text":rowCommercialSerums[i]['commercial_serum_name'],
+                    "value":rowCommercialSerums[i]['commercial_serum_id'],
+                })
+            }
+
+            for(let i = 0;i < resultSerums.length;i++){
+
+                formattedData.push({
+                    "text":resultSerums[i]['urine_control_name'],
+                    "value":resultSerums[i]['urine_control_id'],
+                })
+            }
+
+            for(let i = 0;i < rowProcessedSerums.length;i++){
+
+                formattedData.push({
+                    "text":rowProcessedSerums[i]['processed_serum_name'],
+                    "value":rowProcessedSerums[i]['processed_serum_id'],
                 })
             }
 
@@ -41,7 +69,7 @@ export const getControllerForId = async (req, res) => {
 
         const { id } = req.params
 
-        const result = await pool.query("SELECT * FROM commercial_serums WHERE id_commercial_serum = $1",[ id ]);
+        const result = await pool.query("SELECT * FROM commercial_serums WHERE commercial_serum_id = $1",[ id ]);
 
         if(result.rows.length == 0) 
             res.status(200).json({"message" : "Ningún suero comercial encontrado para ese id","code" : 404})

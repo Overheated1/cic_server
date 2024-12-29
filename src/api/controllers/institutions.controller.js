@@ -30,3 +30,29 @@ export const getAllInstitutions = async (req, res) => {
         console.error(error);
     }
 }
+
+
+//GET USER BY ID
+export const getInstitution = async (req, res) => {
+    try {
+        const { institution_id } = req.params;
+
+        const result = await pool.query("SELECT * FROM institutions WHERE institution_id = $1", [institution_id]);
+        
+        if(result.rows.length == 0) 
+            res.status(409).json({"message" : "Institución no encontrada","code" : 409})
+        else
+            res.status(200).json(
+                {
+                    "result": result.rows[0],
+                    "code": 200,
+                }
+            );
+
+        updateQueryLogs("success");
+    } catch (error) {
+        res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
+        console.error(error);
+    }
+}

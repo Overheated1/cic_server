@@ -14,14 +14,11 @@ export const insertRepeatability = async (req, res) => {
             temperature_value,
             institution_id,
             determination_id,
-            temperature_type_id,
+            temperature_type,
             equipment_name,
             header_id,
             analytic_method_name,
             analytic_technique_name,
-            controller_concentration,
-            is_commercial_serum,
-            controller_commercial_brand,
             repeatability_id,
             repeatability_date,
         } = formHeaders;
@@ -39,24 +36,23 @@ export const insertRepeatability = async (req, res) => {
             //IF NO ARE PREVIOUS REPEATABILITY
             if(result_header == undefined || result_header?.rows?.length == undefined || result_header?.rows?.length == 0){
                 let remaining_modifications = 2;
-                result_repeatability_header = await pool.query("INSERT INTO table_headers (controller_id,temperature_value,institution_id,remaining_modifications,determination_id,temperature_type_id,equipment_name,analytic_method_name,analytic_technique_name,is_commercial_serum) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *", [controller_id,temperature_value,institution_id,remaining_modifications,determination_id,temperature_type_id,equipment_name,analytic_method_name,analytic_technique_name,is_commercial_serum]);
+                result_repeatability_header = await pool.query("INSERT INTO table_headers (controller_id,temperature_value,institution_id,remaining_modifications,determination_id,temperature_type,equipment_name,analytic_method_name,analytic_technique_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *", [controller_id,temperature_value,institution_id,remaining_modifications,determination_id,temperature_type,equipment_name,analytic_method_name,analytic_technique_name]);
                 result_repeatability = await pool.query("INSERT INTO repeatability_tables (repeatability_date,header_id) VALUES($1,$2) RETURNING *", [repeatability_date,result_repeatability_header.rows[0]['header_id']]);
             }else{
                 let remaining_modifications = result_header.rows[0]['remaining_modifications'];
-                result_repeatability_header = await pool.query("UPDATE table_headers SET controller_id = $1,temperature_value = $2,institution_id = $3,remaining_modifications = $4,determination_id = $5,temperature_type_id = $6,equipment_name = $7 WHERE header_id=$8 RETURNING *", [controller_id,temperature_value,institution_id,remaining_modifications,determination_id,temperature_type_id,equipment_name,header_id]);
-                result_controller = await pool.query("UPDATE commercial_serums SET commercial_brand = $1,concentration = $2 WHERE id_commercial_serum=$3 RETURNING *", [controller_commercial_brand,controller_concentration,controller_id]);
+                result_repeatability_header = await pool.query("UPDATE table_headers SET controller_id = $1,temperature_value = $2,institution_id = $3,remaining_modifications = $4,determination_id = $5,temperature_type = $6,equipment_name = $7,analytic_method_name = $8,analytic_technique_name = $9 WHERE header_id=$10 RETURNING *", [controller_id,temperature_value,institution_id,remaining_modifications,determination_id,temperature_type,equipment_name,analytic_method_name,analytic_technique_name,header_id]);
                 result_repeatability = await pool.query("UPDATE repeatability_tables SET repeatability_date = $1,header_id = $2 WHERE repeatability_id = $3 RETURNING * ", [repeatability_date,result_repeatability_header.rows[0]['header_id'],repeatability_id]);
-                
-                if(result_controller.rows[0] && result_repeatability_header.rows[0]){
-                    result_repeatability_header.rows[0]['controller_commercial_brand'] = result_controller.rows[0]['controller_commercial_brand'];
-                    result_repeatability_header.rows[0]['controller_concentration'] = result_controller.rows[0]['controller_concentration'];
-                }
             }
+
             if(result_repeatability_header.rows[0] && result_repeatability.rows[0]){
                 result_fragments = await pool.query("DELETE FROM repeatability_tables_fragments WHERE repeatability_id = $1 RETURNING * ", [result_repeatability.rows[0]['repeatability_id']]);
-                for(let i =0 ; i < tableFragments.length;i++){
-                    result_fragments = await pool.query("INSERT INTO repeatability_tables_fragments (repeatability_id,date,d1,d2,n) VALUES ($1,$2,$3,$4,$5) RETURNING * ", [result_repeatability.rows[0]['repeatability_id'],tableFragments[i].date,tableFragments[i].d1,tableFragments[i].d2,tableFragments[i].n]);
+
+                let tableFragmentsArray = Object.keys(tableFragments);
+                for(let i = 0;i < tableFragmentsArray.length;i++){
+                    let data = tableFragments[tableFragmentsArray[i]];
+                    result_fragments = await pool.query("INSERT INTO repeatability_tables_fragments (repeatability_id,date,d1,d2,n) VALUES ($1,$2,$3,$4,$5) RETURNING * ", [result_repeatability.rows[0]['repeatability_id'],data.date,data.d1,data.d2,data.n]);
                 }
+                
                 res.json(
                     {
                         "result" :
@@ -69,9 +65,8 @@ export const insertRepeatability = async (req, res) => {
                     );
             }else{
                 res.status(200).json({
-                    "result": {...repeatabilityData.rows,...headerData.rows},
                     "code" : 409,
-                    "message" : "No se pudo insertar los datos de la repetibilidad buscada"
+                    "message" : "No se pudo insertar los datos de la repetibilidad"
                 });
             }
             
@@ -95,15 +90,7 @@ export const getRepeatability = async (req, res) => {
 
         if(result?.rows?.length){
             tableFragmentsData = await pool.query("SELECT d1,d2,date,n FROM repeatability_tables_fragments WHERE repeatability_id = $1",[result.rows[0]['repeatability_id']]);
-            let controller_data = await pool.query("SELECT * FROM commercial_serums WHERE id_commercial_serum = $1",[ result.rows[0]['controller_id'] ]);
-            console.log("result",tableFragmentsData.rows,result.rows);
-
-
-                if(controller_data?.rows != undefined && controller_data?.rows.length){{
-                    result.rows[0]['controller_concentration'] = controller_data.rows[0]['concentration']; 
-                    result.rows[0]['controller_commercial_brand'] = controller_data.rows[0]['commercial_brand']; 
-                }
-            }
+            
             res.status(200).json({
                 "result": {...result.rows[0],table_fragments:tableFragmentsData.rows},
                 "code" : 200
@@ -112,6 +99,44 @@ export const getRepeatability = async (req, res) => {
         else{
             res.status(200).json({
                 "result" : {"header_id" : -1,"repeatability_id" : -1},
+                "code" : 200
+            });
+            return;
+        }
+
+        updateQueryLogs("success");
+    } catch (error) {
+        res.status(500).json({"message" : "Error en servidor","code" : 500});
+        updateQueryLogs("error");
+        console.error(error);
+    }
+}
+
+export const updateAndGetRemainingModificationsRepeatability = async (req, res) => {
+    try {
+        const { repeatability_date,determination_id } = req.body;
+
+        let result = await pool.query(`
+            UPDATE table_headers AS th
+            SET remaining_modifications = remaining_modifications - 1
+            WHERE remaining_modifications > 0
+            AND th.header_id IN (
+                SELECT rp.header_id 
+                FROM repeatability_tables AS rp 
+                WHERE rp.repeatability_date = $1 
+                AND th.determination_id = $2
+            )
+            RETURNING remaining_modifications;
+        `, [repeatability_date, determination_id]);
+        
+        if(result?.rows?.[0]){
+            res.status(200).json({
+                "result": result.rows[0],
+                "code" : 200
+            });
+        }else{
+            res.status(200).json({
+                "result" : {remaining_modifications : 2},
                 "code" : 200
             });
             return;
