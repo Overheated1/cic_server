@@ -1,3 +1,5 @@
+import pool from "./db.js"; 
+
 const validateName = (value,errorCodes) => {
     if(/^[A-Z][a-z]+( [A-Z][a-z]+)*$/.test(value)){
         return true;
@@ -40,3 +42,22 @@ const validateUser = (value,errorCodes) => {
     }
     return false;
 }
+
+export const validateTemplateId = async (req, res, next) => {
+    const { id } = req.params;
+    console.log(req.params,parseInt(id),isNaN(parseInt(id)))
+    if (isNaN(parseInt(id))) {
+      return res.status(400).json({ error: 'Invalid template ID' });
+    }
+  
+    try {
+      const result = await pool.query('SELECT 1 FROM custom_template WHERE id = $1', [id]);
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      next();
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  };
+  

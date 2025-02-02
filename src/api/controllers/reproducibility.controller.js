@@ -106,6 +106,27 @@ export const updateAndGetRemainingModificationsReproducibility = async (req, res
     }
 }
 
+export const getMonthRange = async (req, res) => {
+    let { start_date,end_date,determination_id } = req.body;
+
+    start_date = new Date(start_date.split("T")[0]);
+    end_date = new Date(end_date.split("T")[0]);
+    
+    let daysMap= {};
+    for (let currentDate = start_date; currentDate <= end_date; currentDate.setDate(currentDate.getDate() + 1)) {
+        let dateToFetch = currentDate.toISOString().split('T')[0];
+        let result = await pool.query("SELECT * FROM reproducibility_tables_fragments as rtf JOIN reproducibility_tables as rt ON rt.reproducibility_id=rtf.reproducibility_id JOIN table_headers as th ON th.header_id=rt.header_id WHERE rtf.date = $1 AND th.determination_id = $2;",[dateToFetch,determination_id]);
+        
+        daysMap[currentDate.getDate()] = result.rows.length > 0;
+    }
+
+
+    res.status(200).json({
+        "result": daysMap,
+        "code" : 200
+    });
+}
+
 //GET ONE reproducibility BASED IN THE DATE
 export const getReproducibility = async (req, res) => {
     try {
@@ -117,7 +138,7 @@ export const getReproducibility = async (req, res) => {
 
         if(result?.rows?.length){
             tableFragmentsData = await pool.query("SELECT * FROM reproducibility_tables_fragments WHERE reproducibility_id = $1",[result.rows[0]['reproducibility_id']]);
-            
+
             res.status(200).json({
                 "result": {...result.rows[0],table_fragments:tableFragmentsData.rows},
                 "code" : 200

@@ -13,6 +13,10 @@ import repeatabilityRoutes from "./api/routes/repeatability.routes.js";
 import reproducibilityRoutes from "./api/routes/reproducibility.routes.js";
 import serumsRoutes from "./api/routes/serums.routes.js";
 import databaseRoutes from "./api/routes/database.routes.js";
+import rolesRoutes from "./api/routes/roles.routes.js";
+import templateRoutes from "./api/routes/template.routes.js";
+import fieldsRoutes from "./api/routes/fields.routes.js";
+import samplesRoutes from "./api/routes/samples.routes.js";
 
 import express_session from "express-session";
 import userApi from "./api/user.js";
@@ -41,7 +45,11 @@ try{
     app.use(reproducibilityRoutes);
     app.use(serumsRoutes);
     app.use(databaseRoutes);
-    
+    app.use(rolesRoutes);
+    app.use(templateRoutes);
+    app.use(fieldsRoutes);
+    app.use(samplesRoutes);
+
     
     //ERROR CODES
     //0 -. OK

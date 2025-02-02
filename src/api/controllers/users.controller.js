@@ -17,14 +17,13 @@ export const updateOrCreateUser = async (req, res) => {
             institution_id
         } = req.body;
 
-        console.log(req.body);
-
         let is_insertion_op = true;
         let result = await pool.query("SELECT u.id FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.id = $1", [id]);
 
         if(result.rows.length){
             is_insertion_op = false;
             result = await pool.query("UPDATE users SET name = $1,password = $2,ci = $3,email = $4,institution_id = $5 WHERE id=$6 RETURNING *", [name,password,ci,email,institution_id,id]);
+            let result_roles = await pool.query("UPDATE users_roles SET role_id = $1 WHERE user_id=$2 RETURNING *", [role_id,result.rows[0]['id']])
         }else{
             result = await pool.query("INSERT INTO users (name,password,ci,email,user_created_date) VALUES($1,$2,$3,$4,$5) RETURNING *", [name,password,ci,email,currentDate])
             if(result?.rows?.length)
@@ -98,7 +97,7 @@ export const getUsersActualYear = async (req,res) => {
 //GET ALL USERS
 export const getUsers = async (req, res) => {
     try {
-        const result = await pool.query("SELECT * FROM users");
+        const result = await pool.query("SELECT u.*,r.*,ur.* FROM users as u JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON r.role_id = ur.role_id");
         
         if(result.rows.length == 0) 
             res.status(409).json({"message" : "Usuarios no encontrados","code" : 409})
@@ -124,24 +123,25 @@ export const getUser = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query("SELECT u.id,u.ci,u.name,u.password,u.institution_id,r.role_name,r.role_deep_level FROM users as u INNER JOIN users_roles as ur ON u.id = ur.user_id JOIN roles as r ON ur.role_id = r.role_id WHERE u.id = $1", [id]);
-
-        result.rows['token'] = jwt.sign({
-            userId: user.id
-        }, `${process.env.JWT_SECRET_KEY}`, {
-            expiresIn: '1h'
-        });
         
         if(result.rows.length == 0) 
             res.status(409).json({"message" : "Usuario no encontrado","code" : 409})
-        else
+        else{
+            result.rows['token'] = jwt.sign({
+                userId: result.rows.id
+            }, `${process.env.JWT_SECRET_KEY}`, {
+                expiresIn: '1h'
+            });
+
             res.status(200).json(
                 {
-                    "result": result.rows,
+                    "result": result.rows[0],
                     "code": 200,
                 }
             );
 
-        updateQueryLogs("success");
+            updateQueryLogs("success");
+        }
     } catch (error) {
         res.status(500).json({"message" : "Error en servidor","code" : 500});
         updateQueryLogs("error");

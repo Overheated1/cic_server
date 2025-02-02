@@ -36,8 +36,10 @@ export const getAllDeterminations = async (req, res) => {
 
 //GET ALL DETERMINATIONS
 export const getDeterminationsWithoutReproducibility = async (req, res) => {
+    const currentDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];//new Date().toISOString().split("T")[0];
+
     try {
-        const result = await pool.query("SELECT * FROM determinations WHERE determination_id NOT IN(SELECT th.determination_id FROM table_headers as th JOIN reproducibility_tables as rt ON th.header_id = rt.header_id JOIN reproducibility_tables_fragments as rtf ON rtf.reproducibility_id = rt.reproducibility_id  WHERE rtf.date = $1);",[new Date().toISOString().split("T")[0]]);
+        const result = await pool.query("SELECT * FROM determinations WHERE determination_id NOT IN(SELECT th.determination_id FROM table_headers as th JOIN reproducibility_tables as rt ON th.header_id = rt.header_id JOIN reproducibility_tables_fragments as rtf ON rtf.reproducibility_id = rt.reproducibility_id  WHERE rtf.date = $1);",[currentDate]);
         // the below query fail when there is no data in table_headers || reproducibility_tables because the join that no success
         // SELECT * FROM determinations as ds JOIN table_headers th ON ds.determination_id != th.determination_id JOIN repeatability_tables as rt ON th.header_id = rt.header_id  WHERE rt.repeatability_date = $1;
 

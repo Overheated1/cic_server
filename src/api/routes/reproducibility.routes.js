@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getReproducibility, insertReproducibility,getReproducibilityByDate,updateAndGetRemainingModificationsReproducibility } from '../controllers/reproducibility.controller.js';
+import { getReproducibility, insertReproducibility,getReproducibilityByDate,updateAndGetRemainingModificationsReproducibility,getMonthRange } from '../controllers/reproducibility.controller.js';
 
 const router = Router();
 
@@ -13,5 +13,6 @@ router.get('/reproducibility', getReproducibilityByDate)
 router.post('/reproducibility', insertReproducibility)
 
 router.post("/reproducibility/remaining-modifications",updateAndGetRemainingModificationsReproducibility);
+router.post("/reproducibility/get-month-range",getMonthRange);
 
 export default router;
